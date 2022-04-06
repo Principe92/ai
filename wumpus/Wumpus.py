@@ -443,7 +443,7 @@ class WumpusProbabilities:
     increase = goalSize - len(self._particles)
     while len(self._particles) < goalSize:
       attempts += 1
-      if attempts % 100 == 0: print (attempts)
+      # if attempts % 100 == 0: print (attempts)
       wumpus = random.choice(list(self._possibleWumpus))
       gold = random.choice(list(self._possibleGold))
         
