@@ -8,7 +8,7 @@ def printResult(domain):
         print('No solution found')
         return ''
 
-    domain_values = [str(domain[dm_key][0]) for dm_key in [*domain]]
+    domain_values = [str(domain[dm_key][0]) for dm_key in domain.keys()]
     result = ''.join(domain_values)
     # print(json.dumps(domain, indent=4))
     print(result)
@@ -19,7 +19,7 @@ def isSolved(domain, dimensions):
     _, width = dimensions
 
     # check that all variable has a solution
-    for key in [*domain]:
+    for key in domain.keys():
         if len(domain[key]) != 1:
             return False
 
@@ -64,8 +64,6 @@ def getOptions(domain, dimensions, position):
         x, domain, dimensions, position), reverse=False)
 
     return options
-    return domain[position]
-
 
 def getDomain(board, dimensions):
 
@@ -104,22 +102,12 @@ def toXY(key):
 
 
 def toDomainKey(x, y):
-    return f'{x},{y}'
+    return "%d,%d" % (x, y)
 
 
 def getPosition(domain):
-
-    # first_unsolved = None
-
-    # for key in [*domain]:
-    #     if len(domain[key]) != 1:
-    #         first_unsolved = key
-    #         break
-
-    # return first_unsolved
-
     options = []
-    for key in [*domain]:
+    for key in domain.keys():
         if len(domain[key]) != 1:
             options.append((key, len(domain[key])))
 
@@ -259,7 +247,7 @@ def CSP(board):
 
     first_unsolved = None
 
-    for key in [*domain]:
+    for key in domain.keys():
         if len(domain[key]) != 1:
             first_unsolved = key
             break
@@ -295,7 +283,7 @@ def CSP(board):
 
     # check if csp is solved
     solved = True
-    for l in [*domain]:
+    for l in domain.keys():
         if len(domain[l]) != 1:
             solved = False
             break
