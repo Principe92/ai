@@ -1,0 +1,1 @@
+python D:\source\repos\ai\sudoku\pokorie.py
