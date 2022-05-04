@@ -2,6 +2,22 @@
 import math
 from turtle import position, width
 
+class Plan():
+    def __init__(self) -> None:
+        pass
+
+class Graph():
+    def __init__(self) -> None:
+        self.levels = 0
+        self.act = {}
+        self.act_mutexes = {}
+        self.prop = {}
+        self.prop_mutexes = {}
+
+class Goal():
+    def __init__(self) -> None:
+        pass
+
 class PopState():
     def __init__(self) -> None:
         self.preconditions = {};
@@ -13,6 +29,10 @@ class PopAlgorithm():
     def __init__(self, input) -> None:
         self.__input = input
 
+
+    def get_input(self, input: str) -> list:
+        input_ls = self.__input.split('),')
+        return self.fix_input(input_ls)
 
     def fix_input(self, input_ls):
         res = []
@@ -86,14 +106,65 @@ class PopAlgorithm():
     
         return goals
 
-    def backtrack():
+    # TODO:
+    def get_steps(self, gvalues):
+
+        steps = []
+
+        for gvalue in gvalues:
+
+            pass
+
+        return steps
+
+    def backtrack(self, plan, level):
+
+        if level == 0:
+            return plan
+
+        
+        new_g = []
+        satisified = True
+
+        for goal in plan['g']:
+
+            steps = self.get_steps(goal)
+
+            plan['plan'] += steps
+            new_g += self.get_preconditions(steps)
+
+        
+        self.backtrack(plan, level-1)
+
+
+    def extract(self, graph: Graph, goal: set, index:int):
+        if index == 0:
+            return Plan()
+
+        return self.search(graph, goal, Plan(), index)
+
+    def search(self, graph: Graph, goal: set, plan: Plan, index: int):
         pass
 
-    
+    def plan(self, graph:Graph, goal:set):
+
+        index = graph.levels - 1
+
+        plan = self.extract(graph, goal, index)
+        if plan:
+            return plan
+
+        
+        while True:
+            index += 1
+            plan = self.extract(graph, goal, index)
+
+            if plan:
+                return plan
+
     def run(self) -> str:
 
-        input_ls = self.__input.split('),')
-        input_ls = self.fix_input(input_ls)
+        input_ls = self.get_input()
 
         dimensions = self.get_dimensions(input_ls)
 
@@ -101,11 +172,25 @@ class PopAlgorithm():
         starts = self.get_start(input_ls)
 
 
-        for goal in goals:
 
-            flaws = self.get_flaws(goal, dimensions, input_ls)
+        # plan = {
+        #     'g': [],
+        #     'plan': []
+        # }
 
-            flaw = flaws[0]
+        # level = 1
+
+
+        # for goal in goals:
+        #     # flaws = self.get_flaws(goal, dimensions, input_ls)
+        #     plan['g'] += [goal]
+
+        
+        # result = backtrack(plan, level)
+
+        
+
+
 
             
 
@@ -118,6 +203,15 @@ class PopAlgorithm():
         return input_ls[0]
         
 
+# What are our constants: robot, position (t0, ..., t24)
+# Initial state: At(tx). Has no preconditions. The same as effects
+# Goal state: Red(tx) & Blue(tx) & Blue(tx). Has no effects. The same as preconditions
+# How many actions can achieve the goal? SetRed(tx, ty), SetBlue(tx, ty)
+# A Plan is made up of: 
+#  1. A set of steps
+#  2. A set of bindings
+#  3. A set of orderings
+#  4. A set of causal links 
 
 
 def main():
