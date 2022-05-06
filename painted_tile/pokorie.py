@@ -2,6 +2,7 @@
 from itertools import permutations
 import math
 from typing import Dict, List, Set, Tuple
+import os
 
 
 class Literal():
@@ -37,7 +38,7 @@ class Literal():
 
         for input in input_ls:
             if input.isAdjacent():
-                if input.formatX() == self.formatX():
+                if input.formatT1() == self.formatT1():
                     literals.append(input)
 
         return literals
@@ -57,20 +58,20 @@ class Literal():
     def isAction(self) -> bool:
         return self.__isaction
 
-    def getY(self) -> int:
+    def getT2(self) -> int:
         return self.__literal[2]
 
-    def formatY(self) -> int:
-        y = str(self.getY())
+    def formatT2(self) -> int:
+        y = str(self.getT2())
         y = y if len(y) > 1 else f'0{y}'
         return f't{y}'
 
-    def formatX(self) -> int:
-        x = str(self.getX())
+    def formatT1(self) -> int:
+        x = str(self.getT1())
         x = x if len(x) > 1 else f'0{x}'
         return f't{x}'
 
-    def getX(self) -> int:
+    def getT1(self) -> int:
         return self.__literal[1]
 
     def getMarker(self) -> str:
@@ -81,10 +82,10 @@ class Literal():
         for goal in goals:
             goalliteral: Literal = goal
 
-            x = self.formatX()
-            goalX = goalliteral.formatX()
+            t2 = self.formatT2()
+            t1 = goalliteral.formatT1()
 
-            if x == goalX:
+            if t2 == t1:
                 return True, goalliteral.getMarker()
 
         return False, None
@@ -100,6 +101,7 @@ class Literal():
                    .replace('Set', '')
                    .replace('Blue', '')
                    .replace('Red', '')
+                   .replace('None', '')
                    .replace('t', '')
                    )
 
@@ -111,6 +113,7 @@ class Literal():
             positionY = self.__toInt(right)
             self.__isaction = 'Set' in marker or 'Move' in marker
             return marker, positionX, positionY
+        
         else:
             self.__isposition = 'At' in self.__input
             self.__isgoal = not self.__isposition
@@ -130,6 +133,10 @@ class Action():
         self.effect_negative: Set[Literal] = set()
         self.__literal: Literal = Literal(action)
 
+    
+    def toLiteral(self) -> Literal:
+        return self.__literal
+
     def __hash__(self) -> int:
         return hash(self.__literal.toTuple())
 
@@ -148,12 +155,21 @@ class Action():
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def fillPersistentAction(self, literal: Literal) -> None:
+        if 'None' not in self.__action:
+            return
+
+        self.precondition_positive.add(literal)
+        self.effect_positive.add(literal)
+        
+
+
     def fillPaintAction(self) -> None:
         if 'Set' not in self.__action:
             return
 
-        t1 = self.__literal.formatX()
-        t2 = self.__literal.formatY()
+        t1 = self.__literal.formatT1()
+        t2 = self.__literal.formatT2()
         marker = self.__literal.getMarker().replace('Set', '')
 
         self.precondition_positive.add(Literal(f'At({t1})'))
@@ -168,8 +184,8 @@ class Action():
         if 'Move' not in self.__action:
             return
 
-        t1 = self.__literal.formatX()
-        t2 = self.__literal.formatY()
+        t1 = self.__literal.formatT1()
+        t2 = self.__literal.formatT2()
 
         self.precondition_positive.add(Literal(f'At({t1})'))
         # self.precondition_positive.add(Literal(f'Adj({t1},{t2})'))
@@ -183,12 +199,18 @@ class Action():
         _, width = dimensions
 
         # Add negative effect
-        for pos in range(width * width):
-            if pos != self.__literal.getY():
-                ty = str(pos)
-                ty = ty if len(ty) > 1 else f'0{ty}'
-                ty = f'At(t{ty})'
-                self.effect_negative.add(Literal(ty))
+        # for x in input_ls:
+        #     if x.isAdjacent():
+        #         if x.formatT1() == t1:
+        #             if x.formatT2() != t2:
+        #                 self.effect_negative.add(Literal(f'Move({x.formatT1()}, {x.formatT2()})'))
+
+        # for pos in range(width * width):
+        #     if pos != self.__literal.getY():
+        #         ty = str(pos)
+        #         ty = ty if len(ty) > 1 else f'0{ty}'
+        #         ty = f'At(t{ty})'
+        #         self.effect_negative.add(Literal(ty))
 
         # for adj in effect.getAdjacents(input_ls):
         #     self.effect_positive.add(adj)
@@ -208,7 +230,7 @@ class Plan():
         return not self.__eq__(other)
 
     def __repr__(self):
-        return f"Plan object. {self._plan}"
+        return f"Plan: {self._plan}"
 
     def append(self, action: Action):
         self._plan.append(action)
@@ -298,7 +320,7 @@ class PlanningGraph():
         return graph
 
     def buildActions(self, graph: Graph) -> None:
-        actions: List[Literal] = []
+        actions: List[Action] = []
         level = graph.levels
 
         for action in self.__pp.actions:
@@ -306,7 +328,15 @@ class PlanningGraph():
             if self.__canApplyAction(action, graph.preconditions[level-1], graph.precondition_mutexes[level-1]):
                 actions.append(action)
 
+        for precondition in graph.preconditions[level - 1]:
+            noAction = Action(f'None({precondition.formatT1()}, {precondition.formatT2()})')
+            noAction.fillPersistentAction(precondition)
+            actions.append(noAction)
+
         graph.actions[level] = actions
+        # print(f'\nBefore sorting: {actions}')
+        # print(f'After sorting: {sorted(actions, reverse=True, key=lambda x: x.toLiteral().getMarker())}')
+        # graph.actions[level] = sorted(actions, reverse=True, key=lambda x: x.toLiteral().getMarker())
 
     def buildPreconditions(self, graph: Graph) -> None:
         level = graph.levels
@@ -440,8 +470,13 @@ class LayeredPlan(object):
         result = ''
 
         for plan in self._layered_plan.values():
-            for action in plan.plan:
-                result = str(action) if len(result) == 0 else f'{result},{str(action)}'
+            # actions = plan.plan
+            actions = sorted(plan.plan, reverse=True, key=lambda x: x.toLiteral().getMarker())
+            for action in actions:
+                action_str = str(action)
+
+                if 'None' not in action_str:
+                    result = action_str if len(result) == 0 else f'{result},{action_str}'
 
         return result
 
@@ -513,7 +548,7 @@ class GraphPlanner():
                     goals.add(precondition)
             return None
 
-    def plan(self, graph: Graph, goal: set):
+    def plan(self, graph: Graph, goal: set, planning_graph: PlanningGraph):
         index = graph.levels - 1
 
         if not goal.issubset(graph.preconditions[index]):
@@ -536,7 +571,7 @@ class GraphPlanner():
 
         while True:
             index += 1
-            graph = PlanningGraph.expand(graph)
+            graph = planning_graph.expand(graph)
             plan = self.extract(graph, goal, index)
             if plan:
                 return self._layered_plan
@@ -592,8 +627,8 @@ class PlanningProblem():
 
         for literal in self.__literals:
             if literal.isAdjacent():
-                t1 = literal.formatY()
-                t2 = literal.formatX()
+                t1 = literal.formatT1()
+                t2 = literal.formatT2()
 
                 canPaint, color = literal.canPaint(self.__goals)
 
@@ -619,7 +654,7 @@ class PlanningProblem():
         input_ls = self.fix_input(input_ls)
         return list(map(lambda x: Literal(x), input_ls))
 
-    def fix_input(self, input_ls):
+    def fix_input(self, input_ls: List[Literal]):
         res = []
 
         for input in input_ls:
@@ -628,15 +663,15 @@ class PlanningProblem():
 
         return res
 
-    def getDimensions(self, input_ls):
+    def getDimensions(self, input_ls: List[Literal]):
         greatest = 0
 
         for input in input_ls:
             if input.isAdjacent():
-                x = input.getX()
-                y = input.getY()
+                t1 = input.getT1()
+                t2 = input.getT2()
 
-                gt = x if x > y else y
+                gt = t1 if t1 > t2 else t2
                 greatest = greatest if greatest > gt else gt
 
         val = int(math.sqrt(greatest + 1))
@@ -675,24 +710,28 @@ class PlanningProblem():
 #  3. A set of orderings
 #  4. A set of causal links
 
+def save(input_str) -> None:
+    dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
-def main(arg):
-    # while True:
-    #     # pm = PlanningProblem(arg)
-    #     pm = PopAlgorithm(input())
-    #     print(pm.run())
+    with open(os.path.join(dir, 'painted_tile/log.txt'), 'w') as file:
+        file.write(input_str)
 
-    planning_graph = PlanningGraph(arg)
-    graph = planning_graph.create(100)
+def main():
+    while True:
+        input_str = input()
 
-    goals = planning_graph.goals
-    graph_planner = GraphPlanner()
-    layered_plan = graph_planner.plan(graph, goals)
+        if 'Adj' not in input_str:
+            continue
 
-    print(layered_plan)
+        save(input_str)
+        planning_graph = PlanningGraph(input_str)
+        graph = planning_graph.create(10)
+
+        goals = planning_graph.goals
+        graph_planner = GraphPlanner()
+        layered_plan = graph_planner.plan(graph, goals, planning_graph)
+        print(layered_plan)
 
 
 if __name__ == "__main__":
-    arg = 'Blue(t02),At(t03),Blue(t04),Blue(t17),Adj(t00,t05),Adj(t00,t01),Adj(t01,t06),Adj(t01,t00),Adj(t01,t02),Adj(t02,t07),Adj(t02,t01),Adj(t02,t03),Adj(t03,t08),Adj(t03,t02),Adj(t03,t04),Adj(t04,t09),Adj(t04,t03),Adj(t05,t00),Adj(t05,t10),Adj(t05,t06),Adj(t06,t01),Adj(t06,t11),Adj(t06,t05),Adj(t06,t07),Adj(t07,t02),Adj(t07,t12),Adj(t07,t06),Adj(t07,t08),Adj(t08,t03),Adj(t08,t13),Adj(t08,t07),Adj(t08,t09),Adj(t09,t04),Adj(t09,t14),Adj(t09,t08),Adj(t10,t05),Adj(t10,t15),Adj(t10,t11),Adj(t11,t06),Adj(t11,t16),Adj(t11,t10),Adj(t11,t12),Adj(t12,t07),Adj(t12,t17),Adj(t12,t11),Adj(t12,t13),Adj(t13,t08),Adj(t13,t18),Adj(t13,t12),Adj(t13,t14),Adj(t14,t09),Adj(t14,t19),Adj(t14,t13),Adj(t15,t10),Adj(t15,t20),Adj(t15,t16),Adj(t16,t11),Adj(t16,t21),Adj(t16,t15),Adj(t16,t17),Adj(t17,t12),Adj(t17,t22),Adj(t17,t16),Adj(t17,t18),Adj(t18,t13),Adj(t18,t23),Adj(t18,t17),Adj(t18,t19),Adj(t19,t14),Adj(t19,t24),Adj(t19,t18),Adj(t20,t15),Adj(t20,t21),Adj(t21,t16),Adj(t21,t20),Adj(t21,t22),Adj(t22,t17),Adj(t22,t21),Adj(t22,t23),Adj(t23,t18),Adj(t23,t22),Adj(t23,t24),Adj(t24,t19),Adj(t24,t23)'
-    # arg = 'Blue(t02),At(t03),Blue(t04),Adj(t00,t05),Adj(t00,t01),Adj(t01,t06),Adj(t01,t00),Adj(t01,t02),Adj(t02,t07),Adj(t02,t01),Adj(t02,t03),Adj(t03,t08),Adj(t03,t02),Adj(t03,t04),Adj(t04,t09),Adj(t04,t03),Adj(t05,t00),Adj(t05,t10),Adj(t05,t06),Adj(t06,t01),Adj(t06,t11),Adj(t06,t05),Adj(t06,t07),Adj(t07,t02),Adj(t07,t12),Adj(t07,t06),Adj(t07,t08),Adj(t08,t03),Adj(t08,t13),Adj(t08,t07),Adj(t08,t09),Adj(t09,t04),Adj(t09,t14),Adj(t09,t08),Adj(t10,t05),Adj(t10,t15),Adj(t10,t11),Adj(t11,t06),Adj(t11,t16),Adj(t11,t10),Adj(t11,t12),Adj(t12,t07),Adj(t12,t17),Adj(t12,t11),Adj(t12,t13),Adj(t13,t08),Adj(t13,t18),Adj(t13,t12),Adj(t13,t14),Adj(t14,t09),Adj(t14,t19),Adj(t14,t13),Adj(t15,t10),Adj(t15,t20),Adj(t15,t16),Adj(t16,t11),Adj(t16,t21),Adj(t16,t15),Adj(t16,t17),Adj(t17,t12),Adj(t17,t22),Adj(t17,t16),Adj(t17,t18),Adj(t18,t13),Adj(t18,t23),Adj(t18,t17),Adj(t18,t19),Adj(t19,t14),Adj(t19,t24),Adj(t19,t18),Adj(t20,t15),Adj(t20,t21),Adj(t21,t16),Adj(t21,t20),Adj(t21,t22),Adj(t22,t17),Adj(t22,t21),Adj(t22,t23),Adj(t23,t18),Adj(t23,t22),Adj(t23,t24),Adj(t24,t19),Adj(t24,t23)'
-    main(arg)
+    main()
