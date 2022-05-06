@@ -199,21 +199,11 @@ class Action():
         _, width = dimensions
 
         # Add negative effect
-        # for x in input_ls:
-        #     if x.isAdjacent():
-        #         if x.formatT1() == t1:
-        #             if x.formatT2() != t2:
-        #                 self.effect_negative.add(Literal(f'Move({x.formatT1()}, {x.formatT2()})'))
-
-        # for pos in range(width * width):
-        #     if pos != self.__literal.getY():
-        #         ty = str(pos)
-        #         ty = ty if len(ty) > 1 else f'0{ty}'
-        #         ty = f'At(t{ty})'
-        #         self.effect_negative.add(Literal(ty))
-
-        # for adj in effect.getAdjacents(input_ls):
-        #     self.effect_positive.add(adj)
+        for x in input_ls:
+            if x.isAdjacent():
+                if x.formatT1() == t1:
+                    if x.formatT2() != t2:
+                        self.effect_negative.add(Literal(f'At({x.formatT2()})'))
 
 
 class Plan():
@@ -280,7 +270,7 @@ class PlanningGraph():
             index = self._graph.levels - 1
             precondition_list = self._graph.preconditions[index]
             precondition_mutex_list = self._graph.precondition_mutexes[index]
-            print(f'Trial #{i}: {precondition_list}')
+            # print(f'Trial #{i}: {precondition_list}')
 
             if goal_set.issubset(precondition_list):
                 # goals in proposition list and
@@ -334,9 +324,6 @@ class PlanningGraph():
             actions.append(noAction)
 
         graph.actions[level] = actions
-        # print(f'\nBefore sorting: {actions}')
-        # print(f'After sorting: {sorted(actions, reverse=True, key=lambda x: x.toLiteral().getMarker())}')
-        # graph.actions[level] = sorted(actions, reverse=True, key=lambda x: x.toLiteral().getMarker())
 
     def buildPreconditions(self, graph: Graph) -> None:
         level = graph.levels
@@ -472,6 +459,7 @@ class LayeredPlan(object):
         for plan in self._layered_plan.values():
             # actions = plan.plan
             actions = sorted(plan.plan, reverse=True, key=lambda x: x.toLiteral().getMarker())
+            # print(actions)
             for action in actions:
                 action_str = str(action)
 
@@ -699,16 +687,6 @@ class PlanningProblem():
 
         return literals
 
-
-# What are our constants: robot, position (t0, ..., t24)
-# Initial state: At(tx). Has no preconditions. The same as effects
-# Goal state: Red(tx) & Blue(tx) & Blue(tx). Has no effects. The same as preconditions
-# How many actions can achieve the goal? SetRed(tx, ty), SetBlue(tx, ty)
-# A Plan is made up of:
-#  1. A set of steps
-#  2. A set of bindings
-#  3. A set of orderings
-#  4. A set of causal links
 
 def save(input_str) -> None:
     dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
