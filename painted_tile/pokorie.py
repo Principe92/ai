@@ -691,7 +691,7 @@ class PlanningProblem():
 def save(input_str) -> None:
     dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
-    with open(os.path.join(dir, 'painted_tile/log.txt'), 'w') as file:
+    with open(os.path.join(dir, 'painted_tile/log.txt'), 'w+') as file:
         file.write(input_str)
 
 def main():
