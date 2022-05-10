@@ -179,6 +179,8 @@ class Action():
         self.precondition_negative.add(Literal(f'Red({t2})'))
 
         self.effect_positive.add(Literal(f'{marker}({t2})'))
+        self.effect_negative.add(Literal(f'At({t2})'))
+
 
     def fillMoveAction(self, input_ls: List[Literal], dimensions: Tuple[int, int]) -> None:
         if 'Move' not in self.__action:
@@ -195,6 +197,8 @@ class Action():
 
         effect = Literal(f'At({t2})')
         self.effect_positive.add(effect)
+
+        self.effect_negative.add(Literal(f'At({t1})'))
 
         _, width = dimensions
 
@@ -270,7 +274,7 @@ class PlanningGraph():
             index = self._graph.levels - 1
             precondition_list = self._graph.preconditions[index]
             precondition_mutex_list = self._graph.precondition_mutexes[index]
-            # print(f'Trial #{i}: {precondition_list}')
+            print(f'Trial #{i}: {precondition_list}')
 
             if goal_set.issubset(precondition_list):
                 # goals in proposition list and
@@ -457,8 +461,8 @@ class LayeredPlan(object):
         result = ''
 
         for plan in self._layered_plan.values():
-            # actions = plan.plan
-            actions = sorted(plan.plan, reverse=True, key=lambda x: x.toLiteral().getMarker())
+            actions = plan.plan
+            # actions = sorted(plan.plan, reverse=True, key=lambda x: x.toLiteral().getMarker())
             # print(actions)
             for action in actions:
                 action_str = str(action)
@@ -626,11 +630,11 @@ class PlanningProblem():
                     action.fillPaintAction()
                     actions.add(action)
 
-                else:
-                    # Add Move action
-                    action = Action(f'Move({t1},{t2})')
-                    action.fillMoveAction(self.__literals, self.__dimensions)
-                    actions.add(action)
+                # else:
+                # Add Move action
+                action = Action(f'Move({t1},{t2})')
+                action.fillMoveAction(self.__literals, self.__dimensions)
+                actions.add(action)
 
             # if literal.isPosition():
 
