@@ -42,9 +42,26 @@ class Literal():
                     literals.append(input)
 
         return literals
-    
+
     def toTuple(self) -> Tuple[str, int, int]:
         return self.__literal
+
+    def isAtTheEdge(self, dimension: Tuple[int, int]) -> bool:
+        if not self.isAdjacent():
+            return False
+
+        _, width = dimension
+
+        edges = [x for x in list(range(width))]  # top
+        edges += [(width - 1)*width + x for x in list(range(width))]  # bottom
+        edges += [width * x for x in list(range(width))]  # left
+        edges += [width * (x+1) - 1 for x in list(range(width))]  # right
+
+        edges = set(edges)
+
+        t2 = self.getT2()
+
+        return t2 in edges
 
     def isGoal(self) -> bool:
         return self.__isgoal
@@ -79,14 +96,24 @@ class Literal():
 
     def canPaint(self, goals: list) -> Tuple[bool, str]:
 
+        goalKeys = {}
+
         for goal in goals:
             goalliteral: Literal = goal
+            goalt1 = goalliteral.formatT1()
 
-            t2 = self.formatT2()
-            t1 = goalliteral.formatT1()
+            goalKeys[goalt1] = goal
 
-            if t2 == t1:
-                return True, goalliteral.getMarker()
+        t2 = self.formatT2()
+        t1 = self.formatT1()
+
+        canPaint = t2 in goalKeys.keys()  # and t1 not in goalKeys.keys()
+
+        # if t1 == goalt1:
+        #     continue
+
+        if canPaint:
+            return canPaint, goalKeys[t2].getMarker()
 
         return False, None
 
@@ -113,7 +140,7 @@ class Literal():
             positionY = self.__toInt(right)
             self.__isaction = 'Set' in marker or 'Move' in marker
             return marker, positionX, positionY
-        
+
         else:
             self.__isposition = 'At' in self.__input
             self.__isgoal = not self.__isposition
@@ -133,7 +160,6 @@ class Action():
         self.effect_negative: Set[Literal] = set()
         self.__literal: Literal = Literal(action)
 
-    
     def toLiteral(self) -> Literal:
         return self.__literal
 
@@ -156,13 +182,11 @@ class Action():
         return not self.__eq__(other)
 
     def fillPersistentAction(self, literal: Literal) -> None:
-        if 'None' not in self.__action:
-            return
+        # if 'None' not in self.__action:
+        #     return
 
         self.precondition_positive.add(literal)
         self.effect_positive.add(literal)
-        
-
 
     def fillPaintAction(self) -> None:
         if 'Set' not in self.__action:
@@ -177,10 +201,16 @@ class Action():
 
         self.precondition_negative.add(Literal(f'Blue({t2})'))
         self.precondition_negative.add(Literal(f'Red({t2})'))
+        # self.precondition_negative.add(Literal(f'At({t2})'))
+
+        # self.precondition_negative.add(Literal(f'Blue({t1})'))
+        # self.precondition_negative.add(Literal(f'Red({t1})'))
+
+        notMarker = 'Blue' if marker == 'Red' else 'Red'
 
         self.effect_positive.add(Literal(f'{marker}({t2})'))
-        self.effect_negative.add(Literal(f'At({t2})'))
-
+        # self.effect_negative.add(Literal(f'At({t2})'))
+        # self.effect_negative.add(Literal(f'{notMarker}({t2})'))
 
     def fillMoveAction(self, input_ls: List[Literal], dimensions: Tuple[int, int]) -> None:
         if 'Move' not in self.__action:
@@ -195,19 +225,24 @@ class Action():
         self.precondition_negative.add(Literal(f'Blue({t2})'))
         self.precondition_negative.add(Literal(f'Red({t2})'))
 
-        effect = Literal(f'At({t2})')
-        self.effect_positive.add(effect)
+        # self.precondition_negative.add(Literal(f'Red({t1})'))
+        # self.precondition_negative.add(Literal(f'Blue({t1})'))
 
-        self.effect_negative.add(Literal(f'At({t1})'))
+        self.effect_positive.add(Literal(f'At({t2})'))
+
+        # self.effect_negative.add(Literal(f'At({t1})'))
+        # self.effect_negative.add(Literal(f'Blue({t2})'))
+        # self.effect_negative.add(Literal(f'Red({t2})'))
 
         _, width = dimensions
 
-        # Add negative effect
         for x in input_ls:
             if x.isAdjacent():
                 if x.formatT1() == t1:
                     if x.formatT2() != t2:
-                        self.effect_negative.add(Literal(f'At({x.formatT2()})'))
+                        # Add negative effect
+                        self.effect_negative.add(
+                            Literal(f'At({x.formatT2()})'))
 
 
 class Plan():
@@ -263,6 +298,15 @@ class PlanningGraph():
     def goals(self) -> Set[Literal]:
         return self.__pp.goals
 
+    def hasSetAction(self, actions: Set[Action]) -> bool:
+        res = []
+
+        for action in actions:
+            if 'Set' in action.toLiteral().getMarker():
+                res.append(action)
+
+        return res
+
     def create(self, maxLevels=10):
         self._graph.preconditions = {0: self.__pp.initials}
         self._graph.levels = 1
@@ -274,9 +318,22 @@ class PlanningGraph():
             index = self._graph.levels - 1
             precondition_list = self._graph.preconditions[index]
             precondition_mutex_list = self._graph.precondition_mutexes[index]
-            print(f'Trial #{i}: {precondition_list}')
+            has = goal_set.intersection(precondition_list)
+            missing = goal_set.difference(has)
+            sameaslast = self._graph.preconditions[index -
+                                                   1] == precondition_list
+            print(
+                f'\nTrial #{i} | Size: {len(precondition_list)} | Has: {has} | Missing: {missing} | Same as last: {sameaslast}')
+            print(
+                f'Trial #{i} | Actions: {self._graph.actions[index]}')
+
+            goal_found = False
 
             if goal_set.issubset(precondition_list):
+                setActions = self.hasSetAction(self._graph.actions[index])
+
+                print(
+                f'Trial #{i} | Goal Found | HasSetAction: {len(setActions) > 0} | Actions: {setActions}')
                 # goals in proposition list and
                 # goals not in mutex proposition list
                 goal_found = True
@@ -288,7 +345,8 @@ class PlanningGraph():
                 if goal_found:
                     break
 
-            elif index > 0 and self._graph.preconditions[index-1] == precondition_list:
+            # if not goal_found and index > 0 and sameaslast:
+            elif index > 0 and sameaslast:
                 self._graph.fixed_point = True
                 break
 
@@ -323,7 +381,7 @@ class PlanningGraph():
                 actions.append(action)
 
         for precondition in graph.preconditions[level - 1]:
-            noAction = Action(f'None({precondition.formatT1()}, {precondition.formatT2()})')
+            noAction = Action(f'{precondition}')
             noAction.fillPersistentAction(precondition)
             actions.append(noAction)
 
@@ -460,15 +518,18 @@ class LayeredPlan(object):
     def __repr__(self):
         result = ''
 
+        print('')
         for plan in self._layered_plan.values():
-            actions = plan.plan
-            # actions = sorted(plan.plan, reverse=True, key=lambda x: x.toLiteral().getMarker())
-            # print(actions)
+            # actions = plan.plan
+            actions = sorted(plan.plan, reverse=True,
+                             key=lambda x: x.toLiteral().getMarker())
+            print(actions)
             for action in actions:
                 action_str = str(action)
 
-                if 'None' not in action_str:
-                    result = action_str if len(result) == 0 else f'{result},{action_str}'
+                if action.toLiteral().isAction():
+                    result = action_str if len(
+                        result) == 0 else f'{result},{action_str}'
 
         return result
 
@@ -505,12 +566,12 @@ class GraphPlanner():
                 return plan
         else:
             # select any p in g
-            precondition = goals.pop()
+            goal = goals.pop()
 
             # compute resolvers
             resolvers = []
             for action in graph.actions[index]:
-                if precondition in action.effect_positive:
+                if goal in action.effect_positive:
                     if plan.plan:
                         mutex = False
                         for action2 in plan.plan:
@@ -537,7 +598,7 @@ class GraphPlanner():
                     return plan_result
                 else:
                     plan.remove(resolver)
-                    goals.add(precondition)
+                    goals.add(goal)
             return None
 
     def plan(self, graph: Graph, goal: set, planning_graph: PlanningGraph):
@@ -586,10 +647,10 @@ class PlanningProblem():
     def __init__(self, input: str) -> None:
         self.__input = input
 
-        self.__literals: List[Literal] = self.get_input()
+        self.__literals: List[Literal] = self.getInput()
 
         self.__dimensions = self.getDimensions(self.__literals)
-        
+
         self.__goals = set(self.getGoalState(self.__literals))
         # self.__goals = set(self.getInitialState(self.__literals))
 
@@ -622,9 +683,9 @@ class PlanningProblem():
                 t1 = literal.formatT1()
                 t2 = literal.formatT2()
 
-                canPaint, color = literal.canPaint(self.__goals)
+                canBePainted, color = literal.canPaint(self.__goals)
 
-                if canPaint:
+                if canBePainted:
                     # Add Set action
                     action = Action(f'Set{color}({t1},{t2})')
                     action.fillPaintAction()
@@ -632,21 +693,24 @@ class PlanningProblem():
 
                 # else:
                 # Add Move action
-                action = Action(f'Move({t1},{t2})')
-                action.fillMoveAction(self.__literals, self.__dimensions)
-                actions.add(action)
+
+                isAtTheEdge = literal.isAtTheEdge(self.__dimensions)
+
+                if not isAtTheEdge or not canBePainted:
+                    action = Action(f'Move({t1},{t2})')
+                    action.fillMoveAction(self.__literals, self.__dimensions)
+                    actions.add(action)
 
             # if literal.isPosition():
 
-
         return actions
 
-    def get_input(self) -> List[Literal]:
+    def getInput(self) -> List[Literal]:
         input_ls = self.__input.split('),')
-        input_ls = self.fix_input(input_ls)
+        input_ls = self.fixInput(input_ls)
         return list(map(lambda x: Literal(x), input_ls))
 
-    def fix_input(self, input_ls: List[Literal]):
+    def fixInput(self, input_ls: List[Literal]):
         res = []
 
         for input in input_ls:
@@ -678,7 +742,6 @@ class PlanningProblem():
                 # start += input.getAdjacents(input_ls)
                 break
 
-
         return start
 
     def getGoalState(self, input_ls: List[Literal]) -> List[Literal]:
@@ -697,6 +760,7 @@ def save(input_str) -> None:
 
     with open(os.path.join(dir, 'painted_tile/log.txt'), 'w+') as file:
         file.write(input_str)
+
 
 def main():
     while True:
