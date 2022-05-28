@@ -1,0 +1,1 @@
+python D:\source\repos\ai\painted_tile\pokorie.py
